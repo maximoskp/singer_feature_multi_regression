@@ -1,36 +1,40 @@
 # https://medium.com/@shahrukhx01/multi-task-learning-with-transformers-part-1-multi-prediction-heads-b7001cf014bf
 # https://discuss.huggingface.co/t/fine-tuning-bert-with-multiple-classification-heads/24453/8
-from transformers import Wav2Vec2Model, HubertConfig, PretrainedConfig, AutoFeatureExtractor, AutoModel
+from transformers import Wav2Vec2Model, Wav2Vec2Config, HubertConfig, PretrainedConfig, AutoFeatureExtractor, AutoModel
 import torch
 from torch import nn
 
 class HuBERTMultiHead(Wav2Vec2Model):
-    def __init__(self, config, **kwargs):
-        super().__init__(PretrainedConfig())
+    def __init__(self,  **kwargs):
+        super().__init__(Wav2Vec2Config())
         
         self.num_labels = kwargs.get('task_labels_map', {})
-        self.config = config
+        # self.config = config
         self.projector_dim = 64
 
-        self.model_id = 'ntu-spml/distilhubert'
-        self.feature_extractor = AutoFeatureExtractor.from_pretrained(
-            self.model_id, do_normalize=True, return_attention_mask=True
-        )
-        self.sampling_rate = self.feature_extractor.sampling_rate
-        self.hubert = AutoModel.from_pretrained(self.model_id)
+        self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.base_model = Wav2Vec2Model.from_pretrained("facebook/hubert-base-ls960", torch_dtype=torch.float16).to(self.dev)
+
+        # self.model_id = 'ntu-spml/distilhubert'
+        # self.feature_extractor = AutoFeatureExtractor.from_pretrained(
+        #     self.model_id, do_normalize=True, return_attention_mask=True
+        # )
+        # self.sampling_rate = self.feature_extractor.sampling_rate
+        # self.hubert = AutoModel.from_pretrained(self.model_id)
 
         ## add task specific output heads - TODO: make a list of linear
         self.projector1 = nn.Linear(
-            config.hidden_size, self.projector_dim
+            self.base_model.config.hidden_size, self.projector_dim
         )
         self.classifier1 = nn.Linear(
             self.projector_dim, list(self.num_labels.values())[0]
         )
         self.projector2 = nn.Linear(
-            config.hidden_size, self.projector_dim
+            self.base_model.config.hidden_size, self.projector_dim
         )
         self.classifier2 = nn.Linear(
-            config.projector_dim, list(self.num_labels.values())[1]
+            self.projector_dim, list(self.num_labels.values())[1]
         )
     # end init
     
