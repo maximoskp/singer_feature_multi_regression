@@ -43,8 +43,3 @@ class SingerMultiTaskDataset(Dataset):
         }
     # end getitem
 # end class
-
-def collate_fn(data):
-    # TODO: apply normalization etc and return proper arrays
-    pass
-# end collate_fn

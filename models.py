@@ -37,7 +37,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
     
     def forward(
         self,
-        input_audios=None,
+        audio_normalized=None,
         attention_mask=None,
         labels=None,
         output_attentions=None,
@@ -47,13 +47,6 @@ class HuBERTMultiHead(Wav2Vec2Model):
     ):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
-        )
-        # TODO: normalization needs to go in the collator
-        audio_normalized = self.audio_normalizer(
-            input_audios,
-            sampling_rate=self.sampling_rate,
-            padding=True,
-            return_attention_mask=True,
         )
         
         audio_tensors = torch.from_numpy(np.array(audio_normalized['input_values'])).half().to(self.dev)
@@ -114,4 +107,16 @@ class HuBERTMultiHead(Wav2Vec2Model):
             attentions=outputs.attentions
         )
     # end forward
+
+    def collate_fn(self, data):
+        input_values = [d['input_values'] for d in data]
+        labels = [d['labels'] for d in data]
+        audio_normalized = self.audio_normalizer(
+            input_values,
+            sampling_rate=self.sampling_rate,
+            padding=True,
+            return_attention_mask=True,
+        )
+        return audio_normalized, labels
+    # end collate_fn
 # end class
