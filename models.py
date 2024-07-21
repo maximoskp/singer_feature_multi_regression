@@ -48,7 +48,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
-
+        # TODO: normalization needs to go in the collator
         audio_normalized = self.audio_normalizer(
             input_audios,
             sampling_rate=self.sampling_rate,

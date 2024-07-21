@@ -10,6 +10,7 @@ class SingerMultiTaskDataset(Dataset):
     def __init__(self, audios_parent_path, csv_path, sampling_rate=16000):
         # audios_parent_path = '/media/maximos/9C33-6BBD/data/melos_singers/Rebetika_vowels/train'
         self.audios_parent_path = audios_parent_path
+        # new_csv_path = '/media/maximos/9C33-6BBD/data/melos_singers/features/multitask_targets.csv'
         self.csv_path = csv_path
         self.sampling_rate = sampling_rate
         # get full audio paths as list
@@ -36,6 +37,14 @@ class SingerMultiTaskDataset(Dataset):
         # make a dict
         feats_line_lists = feats_line.to_dict('tight')
         feats_line_dict = dict( zip( feats_line_lists['columns'] , feats_line_lists['data'][0] ) )
-        pass
+        return {
+            'input_values': audio_var,
+            'labels': feats_line_dict
+        }
     # end getitem
 # end class
+
+def collate_fn(data):
+    # TODO: apply normalization etc and return proper arrays
+    pass
+# end collate_fn
