@@ -64,6 +64,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
         pooled_y = outputs['last_hidden_state'].mean(axis=1)
         logits = None
         loss = None
+        self.problem_type = None
 
         for task_name in self.task_labels:
             y = self.projectors[task_name](pooled_y)
@@ -77,38 +78,50 @@ class HuBERTMultiHead(Wav2Vec2Model):
                     if self.num_labels[task_name] == 1:
                         self.problem_type = "regression"
                     elif self.num_labels[task_name] > 1 and (
-                        labels[task_name].dtype == torch.long or labels[task_name].dtype == torch.int
+                        isinstance(labels[task_name][0], int)
                     ):
+                        print('single_label_classification')
                         self.problem_type = "single_label_classification"
                     else:
+                        print('multi_label_classification')
                         self.problem_type = "multi_label_classification"
                 # apply loss
-                if self.config.problem_type == "regression":
+                if self.problem_type == "regression":
                     loss_fn = MSELoss()
+                    print('regression 0')
                     if self.num_labels[task_name] == 1:
                         if loss is None:
-                            loss = loss_fn(logits.squeeze(), labels[task_name].squeeze())
+                            print('regression 1')
+                            # loss = loss_fn(logits.squeeze(), labels[task_name].squeeze())
+                            loss = loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).to(self.dev))
                         else:
-                            loss += loss_fn(logits.squeeze(), labels[task_name].squeeze())
+                            print('regression 2')
+                            # loss += loss_fn(logits.squeeze(), labels[task_name].squeeze())
+                            loss += loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).to(self.dev))
                     else:
+                        print('regression 3')
                         loss = loss_fn(logits, labels)
-                elif self.config.problem_type == "single_label_classification":
+                elif self.problem_type == "single_label_classification":
                     loss_fn = CrossEntropyLoss()
-                    print(self.num_labels[task_name])
-                    print(labels)
+                    print('single_label_classification 0')
                     if loss is None:
+                        print('single_label_classification 1')
                         loss = loss_fn(
                             logits.view(-1, self.num_labels[task_name]), labels.view(-1)
                         )
                     else:
+                        print('single_label_classification 2')
                         loss += loss_fn(
                             logits.view(-1, self.num_labels[task_name]), labels.view(-1)
                         )
-                elif self.config.problem_type == "multi_label_classification":
+                elif self.problem_type == "multi_label_classification":
                     loss_fn = BCEWithLogitsLoss()
+                    print('multi_label_classification 0')
                     if loss is None:
+                        print('multi_label_classification 1')
                         loss = loss_fn(logits, labels)
                     else:
+                        print('multi_label_classification 2')
                         loss += loss_fn(logits, labels)
         if not return_dict:
             output = (logits,) + outputs[2:]
