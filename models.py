@@ -10,7 +10,8 @@ import numpy as np
 class HuBERTMultiHead(Wav2Vec2Model):
     def __init__(self,  **kwargs):
         super().__init__(Wav2Vec2Config())
-        self.task_labels = kwargs.get('task_labels_map', {})
+        self.num_labels = kwargs.get('task_labels_num_out', {})
+        self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
         self.projector_dim = 64
@@ -26,12 +27,12 @@ class HuBERTMultiHead(Wav2Vec2Model):
         ## add task specific output heads
         self.projectors = {}
         self.classifiers = {}
-        for tl in self.task_labels.keys():
+        for tl in self.task_labels:
             self.projectors[tl] = nn.Linear(
                 self.hubert.config.hidden_size, self.projector_dim
             ).half().to(self.dev)
             self.classifiers[tl] = nn.Linear(
-                self.projector_dim, self.task_labels[tl]
+                self.projector_dim, self.num_labels[tl]
             ).half().to(self.dev)
     # end init
     
@@ -42,15 +43,15 @@ class HuBERTMultiHead(Wav2Vec2Model):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
-        return_dict=None,
-        task_name=None,
+        return_dict=None
     ):
+        
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
         
-        audio_tensors = torch.from_numpy(np.array(audio_normalized['input_values'])).half().to(self.dev)
-        attention_mask = torch.from_numpy(np.array(audio_normalized['attention_mask'])).half().to(self.dev)
+        audio_tensors = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
+        attention_mask = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
 
         outputs = self.hubert(
             audio_tensors,
@@ -59,17 +60,16 @@ class HuBERTMultiHead(Wav2Vec2Model):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict
         )
-        print('after base model')
 
         pooled_y = outputs['last_hidden_state'].mean(axis=1)
         logits = None
         loss = None
 
-        if task_name is not None:
+        for task_name in self.task_labels:
             y = self.projectors[task_name](pooled_y)
             logits = self.classifiers[task_name](y)
             self.problem_type = None
-
+            
             # if labels are given, i.e., if in training mode
             if labels is not None:
                 # check the type of problem, i.e., regression or singe/multi classfication
@@ -77,26 +77,39 @@ class HuBERTMultiHead(Wav2Vec2Model):
                     if self.num_labels[task_name] == 1:
                         self.problem_type = "regression"
                     elif self.num_labels[task_name] > 1 and (
-                        labels.dtype == torch.long or labels.dtype == torch.int
+                        labels[task_name].dtype == torch.long or labels[task_name].dtype == torch.int
                     ):
                         self.problem_type = "single_label_classification"
                     else:
                         self.problem_type = "multi_label_classification"
                 # apply loss
                 if self.config.problem_type == "regression":
-                    loss_fct = MSELoss()
+                    loss_fn = MSELoss()
                     if self.num_labels[task_name] == 1:
-                        loss = loss_fct(logits.squeeze(), labels.squeeze())
+                        if loss is None:
+                            loss = loss_fn(logits.squeeze(), labels[task_name].squeeze())
+                        else:
+                            loss += loss_fn(logits.squeeze(), labels[task_name].squeeze())
                     else:
-                        loss = loss_fct(logits, labels)
+                        loss = loss_fn(logits, labels)
                 elif self.config.problem_type == "single_label_classification":
-                    loss_fct = CrossEntropyLoss()
-                    loss = loss_fct(
-                        logits.view(-1, self.num_labels[task_name]), labels.view(-1)
-                    )
+                    loss_fn = CrossEntropyLoss()
+                    print(self.num_labels[task_name])
+                    print(labels)
+                    if loss is None:
+                        loss = loss_fn(
+                            logits.view(-1, self.num_labels[task_name]), labels.view(-1)
+                        )
+                    else:
+                        loss += loss_fn(
+                            logits.view(-1, self.num_labels[task_name]), labels.view(-1)
+                        )
                 elif self.config.problem_type == "multi_label_classification":
-                    loss_fct = BCEWithLogitsLoss()
-                    loss = loss_fct(logits, labels)
+                    loss_fn = BCEWithLogitsLoss()
+                    if loss is None:
+                        loss = loss_fn(logits, labels)
+                    else:
+                        loss += loss_fn(logits, labels)
         if not return_dict:
             output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
@@ -110,7 +123,12 @@ class HuBERTMultiHead(Wav2Vec2Model):
 
     def collate_fn(self, data):
         input_values = [d['input_values'] for d in data]
-        labels = [d['labels'] for d in data]
+        # labels needs to be a dict of lists
+        labels = {}
+        for d in data:
+            for k in d['labels'].keys():
+                labels.setdefault(k,[]).append( d['labels'][k] )
+        # labels = [d['labels'] for d in data]
         audio_normalized = self.audio_normalizer(
             input_values,
             sampling_rate=self.sampling_rate,

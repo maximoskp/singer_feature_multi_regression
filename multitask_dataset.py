@@ -33,7 +33,7 @@ class SingerMultiTaskDataset(Dataset):
         # load audio with librosa in the desired sample rate as mono
         audio_var, _ = librosa.load(self.audio_paths[idx], sr=self.sampling_rate)
         # get proper line values from csv
-        feats_line = self.feats[ self.feats['names'] == self.names[0] ]
+        feats_line = self.feats[ self.feats['names'] == self.names[idx] ]
         # make a dict
         feats_line_lists = feats_line.to_dict('tight')
         feats_line_dict = dict( zip( feats_line_lists['columns'] , feats_line_lists['data'][0] ) )
