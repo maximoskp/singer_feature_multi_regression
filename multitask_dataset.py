@@ -23,6 +23,10 @@ class SingerMultiTaskDataset(Dataset):
         # for defining regression or classification
         task_labels_num = {k:1 for k in list(self.feats.columns)}
         task_labels_num['singer_id'] = self.feats['singer_id'].max()+1
+        # normalize all regression features
+        for c in self.feats.columns:
+            if c != 'singer_id' and c != 'names' and 'Unn' not in c:
+                self.feats[c] = (self.feats[c]-self.feats[c].mean())/self.feats[c].std()
     # end init
 
     def __len__(self):
