@@ -34,6 +34,9 @@ class HuBERTMultiHead(Wav2Vec2Model):
             self.classifiers[tl] = nn.Linear(
                 self.projector_dim, self.num_labels[tl]
             ).half().to(self.dev)
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax()
+        self.sigmoid = nn.Sigmoid()
     # end init
     
     def forward(
@@ -61,14 +64,16 @@ class HuBERTMultiHead(Wav2Vec2Model):
             return_dict=return_dict
         )
 
-        pooled_y = outputs['last_hidden_state'].mean(axis=1)
+        pooled_y = outputs['last_hidden_state'].sum(axis=1)
+        # pooled_y = outputs['last_hidden_state'][:,-1,:]
         logits = None
         loss = None
         self.problem_type = None
 
         for task_name in self.task_labels:
+            pooled_y = self.relu( pooled_y )
             y = self.projectors[task_name](pooled_y)
-            logits = self.classifiers[task_name](y)
+            y = self.relu( y )
             self.problem_type = None
             
             # if labels are given, i.e., if in training mode
@@ -85,6 +90,8 @@ class HuBERTMultiHead(Wav2Vec2Model):
                         self.problem_type = "multi_label_classification"
                 # apply loss
                 if self.problem_type == "regression":
+                    y = self.classifiers[task_name](y)
+                    logits = self.sigmoid(y)
                     loss_fn = MSELoss()
                     if self.num_labels[task_name] == 1:
                         if loss is None:
@@ -95,10 +102,13 @@ class HuBERTMultiHead(Wav2Vec2Model):
                             loss += loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
                     else:
                         loss = loss_fn(logits, labels)
+                    print('task_name: ', task_name)
                     print(torch.FloatTensor(labels[task_name]).half().to(self.dev))
                     print(logits.squeeze())
                     print('loss 0: ', loss)
                 elif self.problem_type == "single_label_classification":
+                    y = self.classifiers[task_name](y)
+                    logits = self.softmax(y)
                     loss_fn = CrossEntropyLoss()
                     if loss is None:
                         loss = loss_fn(
@@ -110,6 +120,8 @@ class HuBERTMultiHead(Wav2Vec2Model):
                         )
                     print('loss 1: ', loss)
                 elif self.problem_type == "multi_label_classification":
+                    y = self.classifiers[task_name](y)
+                    logits = self.sigmoid(y)
                     loss_fn = BCEWithLogitsLoss()
                     if loss is None:
                         loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).half().to(self.dev))

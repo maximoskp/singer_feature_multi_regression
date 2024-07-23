@@ -26,7 +26,8 @@ class SingerMultiTaskDataset(Dataset):
         # normalize all regression features
         for c in self.feats.columns:
             if c != 'singer_id' and c != 'names' and 'Unn' not in c:
-                self.feats[c] = (self.feats[c]-self.feats[c].mean())/self.feats[c].std()
+                # self.feats[c] = (self.feats[c]-self.feats[c].mean())/self.feats[c].std()
+                self.feats[c] = (self.feats[c]-self.feats[c].min())/(self.feats[c].max()-self.feats[c].min())
     # end init
 
     def __len__(self):
