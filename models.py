@@ -18,7 +18,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
 
         self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.hubert = Wav2Vec2Model.from_pretrained("facebook/hubert-base-ls960", torch_dtype=torch.float16).to(self.dev)
+        self.hubert = Wav2Vec2Model.from_pretrained("facebook/hubert-base-ls960", torch_dtype=torch.float32).to(self.dev)
         self.audio_normalizer = Wav2Vec2FeatureExtractor.from_pretrained(
             "facebook/hubert-base-ls960"
         )
@@ -30,11 +30,17 @@ class HuBERTMultiHead(Wav2Vec2Model):
         for tl in self.task_labels:
             self.projectors[tl] = nn.Linear(
                 self.hubert.config.hidden_size, self.projector_dim
-            ).half().to(self.dev)
+            ).to(self.dev)
             self.classifiers[tl] = nn.Linear(
                 self.projector_dim, self.num_labels[tl]
-            ).half().to(self.dev)
-        self.relu = nn.ReLU()
+            ).to(self.dev)
+            # self.projectors[tl] = nn.Linear(
+            #     self.hubert.config.hidden_size, self.projector_dim
+            # ).half().to(self.dev)
+            # self.classifiers[tl] = nn.Linear(
+            #     self.projector_dim, self.num_labels[tl]
+            # ).half().to(self.dev)
+        self.relu = nn.LeakyReLU()
         self.softmax = nn.Softmax()
         self.sigmoid = nn.Sigmoid()
     # end init
@@ -53,8 +59,10 @@ class HuBERTMultiHead(Wav2Vec2Model):
             return_dict if return_dict is not None else self.config.use_return_dict
         )
         
-        audio_tensors = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
-        attention_mask = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
+        # audio_tensors = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
+        # attention_mask = torch.from_numpy(np.array(audio_normalized)).half().to(self.dev)
+        audio_tensors = torch.from_numpy(np.array(audio_normalized)).to(self.dev)
+        attention_mask = torch.from_numpy(np.array(audio_normalized)).to(self.dev)
 
         outputs = self.hubert(
             audio_tensors,
@@ -69,11 +77,17 @@ class HuBERTMultiHead(Wav2Vec2Model):
         logits = None
         loss = None
         self.problem_type = None
+        task_logits = {}
+        pooled_y = self.relu( pooled_y )
+        print('pooled: ', pooled_y)
 
         for task_name in self.task_labels:
-            pooled_y = self.relu( pooled_y )
+            y = None
+            logits = None
             y = self.projectors[task_name](pooled_y)
+            print('projector y: ', y)
             y = self.relu( y )
+            print('projector relu y: ', y)
             self.problem_type = None
             
             # if labels are given, i.e., if in training mode
@@ -91,20 +105,30 @@ class HuBERTMultiHead(Wav2Vec2Model):
                 # apply loss
                 if self.problem_type == "regression":
                     y = self.classifiers[task_name](y)
+                    print('classifiers y: ', y)
                     logits = self.sigmoid(y)
+                    print('sigmoid logits: ', logits)
                     loss_fn = MSELoss()
                     if self.num_labels[task_name] == 1:
                         if loss is None:
                             # loss = loss_fn(logits.squeeze(), labels[task_name].squeeze())
-                            loss = loss_fn(logits.squeeze().half().to(self.dev), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            # loss = loss_fn(logits.squeeze().half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            # loss = loss_fn(logits.half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).to(self.dev))
+                            print('sigmoid logits 1: ', logits)
                         else:
                             # loss += loss_fn(logits.squeeze(), labels[task_name].squeeze())
-                            loss += loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            # loss += loss_fn(logits.squeeze().half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            # loss += loss_fn(logits.half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                            loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).to(self.dev))
+                            print('sigmoid logits 2: ', logits)
                     else:
                         loss = loss_fn(logits, labels)
+                        print('sigmoid logits 3: ', logits)
                     print('task_name: ', task_name)
-                    print(torch.FloatTensor(labels[task_name]).half().to(self.dev))
-                    print(logits.squeeze())
+                    # print(torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                    print(torch.FloatTensor(labels[task_name]).to(self.dev))
+                    print('logits squeeze', logits)
                     print('loss 0: ', loss)
                 elif self.problem_type == "single_label_classification":
                     y = self.classifiers[task_name](y)
@@ -124,17 +148,20 @@ class HuBERTMultiHead(Wav2Vec2Model):
                     logits = self.sigmoid(y)
                     loss_fn = BCEWithLogitsLoss()
                     if loss is None:
-                        loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                        # loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                        loss = loss_fn(logits, torch.FloatTensor(labels[task_name]).to(self.dev))
                     else:
-                        loss += loss_fn(logits, torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                        # loss += loss_fn(logits, torch.FloatTensor(labels[task_name]).half().to(self.dev))
+                        loss += loss_fn(logits, torch.FloatTensor(labels[task_name]).to(self.dev))
                     print('loss 2: ', loss)
-            break
+                task_logits.setdefault(task_name, []).append(logits)
+                break
         if not return_dict:
             output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else output
         return SequenceClassifierOutput(
             loss=loss,
-            logits=logits,
+            logits=task_logits,
             hidden_states=outputs['last_hidden_state'],
             attentions=outputs.attentions
         )
