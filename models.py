@@ -88,6 +88,8 @@ class HuBERTMultiHead(Wav2Vec2Model):
             # print('projector y: ', y)
             y = self.relu( y )
             # print('projector relu y: ', y)
+            y = self.classifiers[task_name](y)
+            # print('classifiers y: ', y)
             self.problem_type = None
             
             # if labels are given, i.e., if in training mode
@@ -104,8 +106,6 @@ class HuBERTMultiHead(Wav2Vec2Model):
                         self.problem_type = "multi_label_classification"
                 # apply loss
                 if self.problem_type == "regression":
-                    y = self.classifiers[task_name](y)
-                    # print('classifiers y: ', y)
                     logits = self.sigmoid(y)
                     # print('sigmoid logits: ', logits)
                     loss_fn = MSELoss()
@@ -120,7 +120,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
                             # loss += loss_fn(logits.squeeze(), labels[task_name].squeeze())
                             # loss += loss_fn(logits.squeeze().half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
                             # loss += loss_fn(logits.half(), torch.FloatTensor(labels[task_name]).half().to(self.dev))
-                            loss = loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).squeeze().to(self.dev))
+                            loss += loss_fn(logits.squeeze(), torch.FloatTensor(labels[task_name]).squeeze().to(self.dev))
                             # print('sigmoid logits 2: ', logits)
                     else:
                         loss = loss_fn(logits, labels)
@@ -131,7 +131,6 @@ class HuBERTMultiHead(Wav2Vec2Model):
                     # print('logits squeeze', logits)
                     # print('loss 0: ', loss)
                 elif self.problem_type == "single_label_classification":
-                    y = self.classifiers[task_name](y)
                     logits = self.softmax(y)
                     loss_fn = CrossEntropyLoss()
                     if loss is None:
@@ -144,7 +143,6 @@ class HuBERTMultiHead(Wav2Vec2Model):
                         )
                     # print('loss 1: ', loss)
                 elif self.problem_type == "multi_label_classification":
-                    y = self.classifiers[task_name](y)
                     logits = self.sigmoid(y)
                     loss_fn = BCEWithLogitsLoss()
                     if loss is None:
