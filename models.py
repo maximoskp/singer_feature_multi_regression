@@ -4,7 +4,7 @@ from transformers import Wav2Vec2Model, Wav2Vec2Config, Wav2Vec2FeatureExtractor
 from transformers.modeling_outputs import SequenceClassifierOutput
 import torch
 from torch import nn
-from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss, ModuleDict
 import numpy as np
 
 class HuBERTMultiHead(Wav2Vec2Model):
@@ -25,8 +25,8 @@ class HuBERTMultiHead(Wav2Vec2Model):
         self.sampling_rate = self.audio_normalizer.sampling_rate
 
         ## add task specific output heads
-        self.projectors = {}
-        self.classifiers = {}
+        self.projectors = ModuleDict()
+        self.classifiers = ModuleDict()
         for tl in self.task_labels:
             self.projectors[tl] = nn.Linear(
                 self.hubert.config.hidden_size, self.projector_dim
@@ -72,7 +72,8 @@ class HuBERTMultiHead(Wav2Vec2Model):
             return_dict=return_dict
         )
 
-        pooled_y = outputs['last_hidden_state'].sum(axis=1)
+        pooled_y = outputs['last_hidden_state'].mean(axis=1)
+        # pooled_y = outputs['last_hidden_state'].sum(axis=1)
         # pooled_y = outputs['last_hidden_state'][:,-1,:]
         logits = None
         loss = None
