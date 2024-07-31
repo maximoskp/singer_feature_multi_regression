@@ -14,7 +14,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
         self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
-        self.projector_dim = 64
+        self.projector_dim = 256
 
         self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,18 +79,18 @@ class HuBERTMultiHead(Wav2Vec2Model):
         loss = None
         self.problem_type = None
         task_logits = {}
+        task_projectors = {}
         pooled_y = self.relu( pooled_y )
         # print('pooled: ', pooled_y)
 
         for task_name in self.task_labels:
             y = None
+            z = None
             logits = None
-            y = self.projectors[task_name](pooled_y)
-            # print('projector y: ', y)
-            y = self.relu( y )
-            # print('projector relu y: ', y)
+            z = self.projectors[task_name](pooled_y)
+            task_projectors[task_name] = z
+            y = self.relu( z )
             y = self.classifiers[task_name](y)
-            # print('classifiers y: ', y)
             self.problem_type = None
             
             # if labels are given, i.e., if in training mode
@@ -161,7 +161,10 @@ class HuBERTMultiHead(Wav2Vec2Model):
         return SequenceClassifierOutput(
             loss=loss,
             logits=task_logits,
-            hidden_states=outputs['last_hidden_state'],
+            hidden_states={
+                'hubert': outputs['last_hidden_state'],
+                'projectors': task_projectors
+            },
             attentions=outputs.attentions
         )
     # end forward

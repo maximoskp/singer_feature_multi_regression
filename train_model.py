@@ -10,8 +10,8 @@ import os
 import csv
 
 # globals
-epochs = 10
-batch_size = 4
+epochs = 1000
+batch_size = 32
 
 save_name = 'frozen_hubert'
 
@@ -30,9 +30,12 @@ with open( results_path, 'w' ) as f:
     writer.writerow( result_fields )
 
 # data folders
-train_audio_folder = '/media/maximos/9C33-6BBD/data/melos_singers/Rebetika_vowels/train/'
-test_audio_folder = '/media/maximos/9C33-6BBD/data/melos_singers/Rebetika_vowels/test/'
-csv_path = '/media/maximos/9C33-6BBD/data/melos_singers/features/multitask_targets.csv'
+train_audio_folder = '/media/maindisk/maximos/data/melos_singers/Rebetika_vowels/train/'
+test_audio_folder = '/media/maindisk/maximos/data/melos_singers/Rebetika_vowels/test/'
+csv_path = '/media/maindisk/maximos/data/melos_singers/features/multitask_targets.csv'
+# train_audio_folder = '/media/maximos/9C33-6BBD/data/melos_singers/Rebetika_vowels/train/'
+# test_audio_folder = '/media/maximos/9C33-6BBD/data/melos_singers/Rebetika_vowels/test/'
+# csv_path = '/media/maximos/9C33-6BBD/data/melos_singers/features/multitask_targets.csv'
 
 # load csv
 feats = pd.read_csv(csv_path, delimiter=',')
