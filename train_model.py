@@ -111,28 +111,30 @@ for epoch in range(epochs):
         running_accuracy = 0
         val_accuracy = 0
         print('validation...')
-        for b in tepoch:
-            y = model(
-                audio_normalized=b[0]['input_values'],
-                attention_mask=b[0]['attention_mask'],
-                labels=b[1],
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=True
-            )
-            # update loss
-            batch_num += 1
-            running_loss += y.loss.item()
-            val_loss = running_loss/batch_num
-            # accuracy
-            prediction = y['logits']['singer_id'][0].argmax(dim=1, keepdim=True).squeeze()
-            running_accuracy += (prediction == torch.Tensor(b[1]['singer_id']).to(model.dev)).sum().item()/len(b[1]['singer_id'])
-            val_accuracy = running_accuracy/batch_num
-        if best_val_loss > val_loss:
-            print('saving!')
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), model_path)
-        print(f'validation: accuracy={val_accuracy}, loss={val_loss}')
-        with open( results_path, 'a' ) as f:
-            writer = csv.writer(f)
-            writer.writerow( [epoch, train_loss, train_accuracy, val_loss, val_accuracy] )
+        with tqdm(test_loader, unit='batch') as tepoch:
+            tepoch.set_description(f"Epoch {epoch} | tst")
+            for b in tepoch:
+                y = model(
+                    audio_normalized=b[0]['input_values'],
+                    attention_mask=b[0]['attention_mask'],
+                    labels=b[1],
+                    output_attentions=False,
+                    output_hidden_states=False,
+                    return_dict=True
+                )
+                # update loss
+                batch_num += 1
+                running_loss += y.loss.item()
+                val_loss = running_loss/batch_num
+                # accuracy
+                prediction = y['logits']['singer_id'][0].argmax(dim=1, keepdim=True).squeeze()
+                running_accuracy += (prediction == torch.Tensor(b[1]['singer_id']).to(model.dev)).sum().item()/len(b[1]['singer_id'])
+                val_accuracy = running_accuracy/batch_num
+            if best_val_loss > val_loss:
+                print('saving!')
+                best_val_loss = val_loss
+                torch.save(model.state_dict(), model_path)
+            print(f'validation: accuracy={val_accuracy}, loss={val_loss}')
+            with open( results_path, 'a' ) as f:
+                writer = csv.writer(f)
+                writer.writerow( [epoch, train_loss, train_accuracy, val_loss, val_accuracy] )

@@ -17,8 +17,12 @@ class SingerMultiTaskDataset(Dataset):
         self.audio_paths = list( Path(self.audios_parent_path).glob('**/*.mp3') )
         # load csv
         self.feats = pd.read_csv(self.csv_path, delimiter=',')
-        # keep file names
-        self.names = self.feats['names']
+        # make sure names are lowercase
+        self.feats['names'] = self.feats['names'].str.lower()
+        # keep file names from audio paths
+        self.names = []
+        for p in self.audio_paths:
+            self.names.append( p.stem.lower() )
         # make a dict that keeps only number of output labels per task
         # for defining regression or classification
         task_labels_num = {k:1 for k in list(self.feats.columns)}
