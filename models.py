@@ -14,6 +14,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
         self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
+        self.intermediate_dim = 512
         self.projector_dim = 256
 
         self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,11 +26,15 @@ class HuBERTMultiHead(Wav2Vec2Model):
         self.sampling_rate = self.audio_normalizer.sampling_rate
 
         ## add task specific output heads
+        self.intermediates = ModuleDict()
         self.projectors = ModuleDict()
         self.classifiers = ModuleDict()
         for tl in self.task_labels:
+            self.intermediates[tl] = nn.Linear(
+                self.hubert.config.hidden_size, self.intermediate_dim
+            ).to(self.dev)
             self.projectors[tl] = nn.Linear(
-                self.hubert.config.hidden_size, self.projector_dim
+                self.intermediate_dim, self.projector_dim
             ).to(self.dev)
             self.classifiers[tl] = nn.Linear(
                 self.projector_dim, self.num_labels[tl]
@@ -43,6 +48,7 @@ class HuBERTMultiHead(Wav2Vec2Model):
         self.relu = nn.LeakyReLU()
         self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
+        self.dropout = nn.Dropout(0.1)
     # end init
     
     def forward(
@@ -87,9 +93,13 @@ class HuBERTMultiHead(Wav2Vec2Model):
             y = None
             z = None
             logits = None
-            z = self.projectors[task_name](pooled_y)
-            task_projectors[task_name] = z
+            z = self.intermediates[task_name](pooled_y)
+            z = self.relu(z)
+            z = self.dropout(z)
+            z = self.projectors[task_name](z)
             y = self.relu( z )
+            z = self.dropout(z)
+            task_projectors[task_name] = z
             y = self.classifiers[task_name](y)
             self.problem_type = None
             
