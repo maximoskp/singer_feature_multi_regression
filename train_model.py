@@ -2,7 +2,7 @@ from multitask_dataset import SingerMultiTaskDataset
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 import torch
-from models import HuBERTMultiHead
+from models import HuBERTFeatureFusion #, HuBERTMultiHead
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -52,7 +52,8 @@ for i in range(1, len(features_list)-3, 1):
 task_labels_num_out['singer_id'] = feats['singer_id'].max()+1 # accounting for zero
 
 # initialize model
-model = HuBERTMultiHead(task_labels_num_out=task_labels_num_out)
+# model = HuBERTMultiHead(task_labels_num_out=task_labels_num_out)
+model = HuBERTFeatureFusion(task_labels_num_out=task_labels_num_out)
 
 # make datasets
 training_data = SingerMultiTaskDataset(train_audio_folder, csv_path)
