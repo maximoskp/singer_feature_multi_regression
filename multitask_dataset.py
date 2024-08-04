@@ -22,7 +22,7 @@ class SingerMultiTaskDataset(Dataset):
         # keep file names from audio paths
         self.names = []
         for p in self.audio_paths:
-            self.names.append( p.stem.lower() )
+            self.names.append( p.stem.lower().replace('kazantzidis_old', 'kazantzidisold') )
         # make a dict that keeps only number of output labels per task
         # for defining regression or classification
         task_labels_num = {k:1 for k in list(self.feats.columns)}

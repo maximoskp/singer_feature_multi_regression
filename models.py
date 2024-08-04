@@ -239,7 +239,8 @@ class HuBERTFeatureFusion(Wav2Vec2Model):
             logits=task_logits,
             hidden_states={
                 'hubert': outputs['last_hidden_state'],
-                'projectors': task_projectors
+                'projectors': task_projectors,
+                'common_projector': pooled_y
             },
             attentions=outputs.attentions
         )
