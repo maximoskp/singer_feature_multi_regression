@@ -2,7 +2,7 @@ from multitask_dataset import SingerMultiTaskDataset
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 import torch
-from models import HuBERTFeatureFusion #, HuBERTMultiHead
+from models import HuBERTNoFusion
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -13,7 +13,7 @@ import csv
 epochs = 1000
 batch_size = 32
 
-save_name = 'frozen_hubert'
+save_name = 'nofusion_frozen_hubert'
 
 # keep best validation loss for saving
 best_val_loss = np.inf
@@ -52,8 +52,7 @@ for i in range(1, len(features_list)-3, 1):
 task_labels_num_out['singer_id'] = feats['singer_id'].max()+1 # accounting for zero
 
 # initialize model
-# model = HuBERTMultiHead(task_labels_num_out=task_labels_num_out)
-model = HuBERTFeatureFusion(task_labels_num_out=task_labels_num_out)
+model = HuBERTNoFusion(task_labels_num_out=task_labels_num_out, gpu_index=0)
 
 # make datasets
 training_data = SingerMultiTaskDataset(train_audio_folder, csv_path)
