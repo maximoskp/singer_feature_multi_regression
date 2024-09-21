@@ -14,11 +14,11 @@ class HuBERTLateFeatureFusion(Wav2Vec2Model):
         self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
-        self.common_base_1_dim = 2048
-        self.common_base_2_dim = 1024
+        # self.common_base_1_dim = 2048
+        # self.common_base_2_dim = 4096
         self.common_projector_dim = 512
-        self.intermediate_dim = 512
-        self.projector_dim = 256
+        self.intermediate_dim = 256
+        self.projector_dim = 128
 
         if 'gpu_index' in kwargs.keys():
             gpu_idx = kwargs['gpu_index']
@@ -34,9 +34,10 @@ class HuBERTLateFeatureFusion(Wav2Vec2Model):
         self.sampling_rate = self.audio_normalizer.sampling_rate
 
         ## add task specific output heads
-        self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
-        self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
-        self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        # self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
+        # self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
+        # self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        self.common_projector = nn.Linear(self.hubert.config.hidden_size, self.common_projector_dim).to(self.dev)
         self.intermediates = ModuleDict()
         self.projectors = ModuleDict()
         self.classifiers = ModuleDict()
@@ -113,12 +114,12 @@ class HuBERTLateFeatureFusion(Wav2Vec2Model):
         task_logits = {}
         task_projectors = {}
         pooled_y = self.relu( pooled_y )
-        pooled_y = self.common_base_1( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
-        pooled_y = self.common_base_2( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_1( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_2( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
         pooled_y = self.common_projector( pooled_y )
         pooled_y = self.relu( pooled_y )
         pooled_y = self.dropout( pooled_y )
@@ -209,9 +210,9 @@ class HuBERTLateFeatureFusion(Wav2Vec2Model):
         # add projector to feature fusion
         for task_name in task_labels_no_singer_id:
             if ff_aggregate is None:
-                ff_aggregate = z
+                ff_aggregate = task_projectors[task_name]
             else:
-                ff_aggregate = torch.cat( (ff_aggregate, z), 1 )
+                ff_aggregate = torch.cat( (ff_aggregate, task_projectors[task_name]), 1 )
                 # ff_aggregate += z
         # print(ff_aggregate.shape)
         task_name = 'singer_id'
@@ -279,11 +280,11 @@ class HuBERTEarlyFeatureFusion(Wav2Vec2Model):
         self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
-        self.common_base_1_dim = 2048
-        self.common_base_2_dim = 1024
+        # self.common_base_1_dim = 2048
+        # self.common_base_2_dim = 4096
         self.common_projector_dim = 512
-        self.intermediate_dim = 512
-        self.projector_dim = 256
+        self.intermediate_dim = 256
+        self.projector_dim = 128
 
         if 'gpu_index' in kwargs.keys():
             gpu_idx = kwargs['gpu_index']
@@ -299,9 +300,10 @@ class HuBERTEarlyFeatureFusion(Wav2Vec2Model):
         self.sampling_rate = self.audio_normalizer.sampling_rate
 
         ## add task specific output heads
-        self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
-        self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
-        self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        # self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
+        # self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
+        # self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        self.common_projector = nn.Linear(self.hubert.config.hidden_size, self.common_projector_dim).to(self.dev)
         self.intermediates = ModuleDict()
         self.projectors = ModuleDict()
         self.classifiers = ModuleDict()
@@ -335,7 +337,8 @@ class HuBERTEarlyFeatureFusion(Wav2Vec2Model):
             # self.classifiers[tl] = nn.Linear(
             #     self.projector_dim, self.num_labels[tl]
             # ).half().to(self.dev)
-        self.relu = nn.LeakyReLU()
+        self.relu = nn.SELU()
+        # self.relu = nn.LeakyReLU()
         self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(0.2)
@@ -377,12 +380,12 @@ class HuBERTEarlyFeatureFusion(Wav2Vec2Model):
         task_logits = {}
         task_projectors = {}
         pooled_y = self.relu( pooled_y )
-        pooled_y = self.common_base_1( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
-        pooled_y = self.common_base_2( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_1( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_2( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
         pooled_y = self.common_projector( pooled_y )
         pooled_y = self.relu( pooled_y )
         pooled_y = self.dropout( pooled_y )
@@ -541,11 +544,11 @@ class HuBERTClassifierBaseline(Wav2Vec2Model):
         self.task_labels = list(self.num_labels.keys())
         # self.num_tasks = len( self.task_labels ) # TODO: we don't need it
         # self.config = config
-        self.common_base_1_dim = 2048
-        self.common_base_2_dim = 1024
+        # self.common_base_1_dim = 2048
+        # self.common_base_2_dim = 1024
         self.common_projector_dim = 512
-        self.intermediate_dim = 512
-        self.projector_dim = 256
+        self.intermediate_dim = 256
+        self.projector_dim = 128
 
         if 'gpu_index' in kwargs.keys():
             gpu_idx = kwargs['gpu_index']
@@ -561,30 +564,35 @@ class HuBERTClassifierBaseline(Wav2Vec2Model):
         self.sampling_rate = self.audio_normalizer.sampling_rate
 
         ## add task specific output heads
-        self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
-        self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
-        self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        # self.common_base_1 = nn.Linear(self.hubert.config.hidden_size, self.common_base_1_dim).to(self.dev)
+        # self.common_base_2 = nn.Linear(self.common_base_1_dim, self.common_base_2_dim).to(self.dev)
+        # self.common_projector = nn.Linear(self.common_base_2_dim, self.common_projector_dim).to(self.dev)
+        self.common_projector = nn.Linear(self.hubert.config.hidden_size, self.common_projector_dim).to(self.dev)
         self.intermediates = ModuleDict()
         self.projectors = ModuleDict()
         self.classifiers = ModuleDict()
         for tl in ['singer_id']:
             if tl != 'singer_id':
-                self.intermediates[tl] = nn.Linear(
-                    self.common_projector_dim, self.intermediate_dim
-                ).to(self.dev)
-                self.projectors[tl] = nn.Linear(
-                    self.intermediate_dim, self.projector_dim
-                ).to(self.dev)
-                self.classifiers[tl] = nn.Linear(
-                    self.projector_dim, self.num_labels[tl]
-                ).to(self.dev)
-            else:
-                self.intermediates[tl] = nn.Linear(
-                    self.common_projector_dim, self.intermediate_dim
-                ).to(self.dev)
+                pass
                 # self.intermediates[tl] = nn.Linear(
-                #     self.projector_dim, self.intermediate_dim
+                #     self.common_projector_dim, self.intermediate_dim
                 # ).to(self.dev)
+                # self.projectors[tl] = nn.Linear(
+                #     self.intermediate_dim, self.projector_dim
+                # ).to(self.dev)
+                # self.classifiers[tl] = nn.Linear(
+                #     self.projector_dim, self.num_labels[tl]
+                # ).to(self.dev)
+            else:
+                # self.intermediates[tl] = nn.Linear(
+                #     self.common_projector_dim, self.intermediate_dim
+                # ).to(self.dev)
+                # self.intermediates[tl] = nn.Linear(
+                #     self.hubert.config.hidden_size, self.intermediate_dim
+                # ).to(self.dev)
+                self.intermediates[tl] = nn.Linear(
+                    self.common_projector_dim, self.intermediate_dim
+                ).to(self.dev)
                 self.projectors[tl] = nn.Linear(
                     self.intermediate_dim, self.projector_dim
                 ).to(self.dev)
@@ -597,7 +605,8 @@ class HuBERTClassifierBaseline(Wav2Vec2Model):
             # self.classifiers[tl] = nn.Linear(
             #     self.projector_dim, self.num_labels[tl]
             # ).half().to(self.dev)
-        self.relu = nn.LeakyReLU()
+        self.relu = nn.SELU()
+        # self.relu = nn.LeakyReLU()
         self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(0.2)
@@ -639,15 +648,16 @@ class HuBERTClassifierBaseline(Wav2Vec2Model):
         task_logits = {}
         task_projectors = {}
         pooled_y = self.relu( pooled_y )
-        pooled_y = self.common_base_1( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
-        pooled_y = self.common_base_2( pooled_y )
-        pooled_y = self.relu( pooled_y )
-        pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_1( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
+        # pooled_y = self.common_base_2( pooled_y )
+        # pooled_y = self.relu( pooled_y )
+        # pooled_y = self.dropout( pooled_y )
         pooled_y = self.common_projector( pooled_y )
         pooled_y = self.relu( pooled_y )
         pooled_y = self.dropout( pooled_y )
+        # =============================================================
         # print('pooled: ', pooled_y)
 
         # task_labels_no_singer_id = [x for x in self.task_labels if x!='singer_id']

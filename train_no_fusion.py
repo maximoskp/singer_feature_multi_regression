@@ -11,7 +11,7 @@ import csv
 
 # globals
 epochs = 1000
-batch_size = 32
+batch_size = 8
 
 save_name = 'nofusion_frozen_hubert'
 
@@ -62,12 +62,15 @@ testing_data = SingerMultiTaskDataset(test_audio_folder, csv_path)
 train_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=model.collate_fn)
 test_loader = DataLoader(testing_data, batch_size=batch_size, shuffle=True, collate_fn=model.collate_fn)
 
+model.train()
+
 # define parameters to train
 # keep hubert frozen
 for p in model.hubert.parameters():
     p.requires_grad = False
 # train projectors and classifiers
 for k in model.projectors.keys():
+    model.intermediates[k].requires_grad = True
     model.projectors[k].requires_grad = True
     model.classifiers[k].requires_grad = True
 

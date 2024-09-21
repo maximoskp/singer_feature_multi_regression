@@ -66,8 +66,16 @@ test_loader = DataLoader(testing_data, batch_size=batch_size, shuffle=True, coll
 # keep hubert frozen
 for p in model.hubert.parameters():
     p.requires_grad = False
+# after warning message
+# model.hubert.encoder.pos_conv_embed.conv.parametrizations.weight.original0.requires_grad = True
+# model.hubert.encoder.pos_conv_embed.conv.parametrizations.weight.original1.requires_grad = True
+# # train common base
+# model.common_base_1.requires_grad = True
+# model.common_base_2.requires_grad = True
+model.common_projector.requires_grad = True
 # train projectors and classifiers
 for k in model.projectors.keys():
+    model.intermediates[k].requires_grad = True
     model.projectors[k].requires_grad = True
     model.classifiers[k].requires_grad = True
 
