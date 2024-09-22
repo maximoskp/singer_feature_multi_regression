@@ -106,8 +106,9 @@ for epoch in range(epochs):
                 return_dict=True
             )
             optimizer.zero_grad()
-            y.loss['regressors'].backward(retain_graph=True)
-            y.loss['classifier'].backward()
+            # y.loss['regressors'].backward(retain_graph=True)
+            # y.loss['classifier'].backward()
+            (y.loss['regressors'] +y.loss['classifier']).backward()
             optimizer.step()
             # update loss
             batch_num += 1
