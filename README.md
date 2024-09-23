@@ -5,7 +5,7 @@ So far the investigation concerns three architectures (but there seems to be som
 
 Baseline singer classification model (no features involved):
 ![Alt text](images/baseline.jpg)
-![Alt text](images/baseline_acc.jpg)
+![Alt text](images/baseline_acc.png)
 
 No fusion model (feature regression and singer classification are preformed independently):
 
