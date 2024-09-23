@@ -8,7 +8,13 @@ Baseline singer classification model (no features involved):
 ![Alt text](images/baseline_acc.png)
 
 No fusion model (feature regression and singer classification are preformed independently):
+![Alt text](images/no_fusion.jpg)
+![Alt text](images/nofusion_acc.png)
 
 Early fusion model (feature regression and singer classification have the same trainable base):
+![Alt text](images/early_fusion.jpg)
+![Alt text](images/early_acc.png)
 
 Late fusion model (singer classification is based on the projectors of feature regression modules and training occurs jointly):
+![Alt text](images/late_fusion.jpg)
+![Alt text](images/late_acc.png)
